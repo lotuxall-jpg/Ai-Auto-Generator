@@ -1,2 +1,12 @@
-- name: List files (debug)
-  run: ls -la
+name: Auto Clip Generator
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:   # <-- this is required
+
+jobs:
+  generate-and-post:
+    runs-on: ubuntu-latest
+    steps:
+      ...
