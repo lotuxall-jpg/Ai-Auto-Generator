@@ -1,1 +1,93 @@
-moviepy
+The error "requirements.txt not found" means the file is not present in the working directory when the workflow runs. The debug step you added runs after the pip install, so it never executes because the install fails first. Let's reorder the steps to debug before installing.
+
+---
+
+🔧 Updated workflow (with debug step early)
+
+Edit .github/workflows/auto-clip.yml and replace the content with:
+
+```yaml
+name: Auto Clip Generator
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  generate-and-post:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: List files (debug)                     # <-- moved before pip install
+        run: ls -la
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install system dependencies (ffmpeg)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run clip generator
+        run: python main.py
+
+      - name: Upload generated video
+        uses: actions/upload-artifact@v4
+        with:
+          name: output
+          path: output/
+        if: success() && hashFiles('output/**') != ''
+
+      - name: Upload log file
+        uses: actions/upload-artifact@v4
+        with:
+          name: posted-log
+          path: posted_log.json
+        if: success() && hashFiles('posted_log.json') != ''
+```
+
+---
+
+📝 Commit and run again
+
+1. Commit this change (click Commit changes directly on the file edit page, or push from your local clone).
+2. Go to Actions → Auto Clip Generator → Run workflow.
+3. Select the branch you just committed to (usually main) and click Run workflow.
+4. Watch the new run.
+
+In the logs, you'll now see the List files (debug) step before the pip install. Expand it and check if requirements.txt appears in the list. If it's missing, then the commit you're running on doesn't have the file – we'll need to ensure you're running on the right branch and that the file is actually committed.
+
+---
+
+🧪 If requirements.txt is still missing
+
+· Check the branch – In the Actions run, click on the run and look at the top – it will show the commit hash. Compare that to the commit hash of the file in the Code tab. If they differ, you might be running an older commit. When manually triggering, ensure you select the correct branch (the one where the file exists).
+· Make sure requirements.txt is in the root – In the file list, it should be listed alongside main.py and .github. If it's not, create it again.
+· Add a step to checkout the specific branch – You can modify the checkout step to explicitly use the branch you want:
+
+```yaml
+- name: Checkout code
+  uses: actions/checkout@v4
+  with:
+    ref: 'main'
+```
+
+---
+
+Once the debug step shows requirements.txt and the install succeeds, the workflow will proceed to run main.py. We'll then see if the simple main.py works or if there are other errors.
+
+Let me know the result after these changes.
